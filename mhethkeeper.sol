@@ -1,60 +1,63 @@
-/* version metahash ETH multi sign wallet 0.1.2 RC */
+/* version metahash ETH multi sign wallet 0.1.3 RC */
 pragma solidity ^0.4.18;
 
 contract mhethkeeper {
 
 	/* contract settings */
-	address public recipient;	/* recipient */
-	uint256 public count;		/* quantity */
 
-	uint public ready;		/* settings are finalized */
-	uint public need_voice;		/* min vote */
-	uint public now_voice;		/* сur vote */
+	/* dynamic data section */
+	address public recipient;			/* recipient */
+	uint256 public amountToTransfer;		/* quantity */
 
-	address public owner;		/* contract creator */
-	mapping (uint => uint) public managers_voices; /*managers vote*/
-	mapping (uint256 => address) public managers; /* managers */
-	uint public managers_count;
+
+	/* static data section */
+	uint public isFinalized;			/* settings are finalized */
+	uint public minVotes;				/* minimum amount of votes */
+	uint public curVotes;				/* current amount of votes */
+	address public owner;				/* contract creator */
+	uint public mgrCount; 				/* number of managers */
+	mapping (uint => uint) public mgrVotes; 	/* managers votes */
+	mapping (uint256 => address) public mgrAddress; /* managers address */
 
 	/* constructor */
 	function mhethkeeper() public{
 		owner = msg.sender;
-		ready = 0;
-		now_voice = 0;
-		managers_count = 1;
-		managers[managers_count] = msg.sender;
-		managers_voices[managers_count] = 0;
+		isFinalized = 0;
+		curVotes = 0;
+		mgrCount = 1;
+		mgrAddress[mgrCount] = msg.sender;
+		mgrVotes[mgrCount] = 0;
 	}
 
-	/* set how many vote are needed */
+	/* set the required number of votes */
 	function SetNeedVoice(uint _count) public{
 		if (msg.sender != owner){
 			revert();
 		}
-		if (managers_count > _count){
+		if (mgrCount > _count){
 			revert();
 		}
-		if (ready == 1){
+		if (isFinalized == 1){
 			revert();
 		}
-		need_voice = _count;
+		minVotes = _count;
 	}
 
 	/* add a wallet manager */
 	function AddManager(address _manager) public{
-		if ((msg.sender == owner) && (ready == 0)){
-			managers_count = managers_count + 1;
-			managers[managers_count] = _manager;
-			managers_voices[managers_count] = 0;
+		if ((msg.sender == owner) && (isFinalized == 0)){
+			mgrCount = mgrCount + 1;
+			mgrAddress[mgrCount] = _manager;
+			mgrVotes[mgrCount] = 0;
 		} else {
 			revert();
 		}
 	}
 
-	/* finalyze settings */
-	function finalyze() public{
-		if ((msg.sender == owner) && (ready == 0)){
-			ready = 1;
+	/* finalize settings */
+	function Finalize() public{
+		if ((msg.sender == owner) && (isFinalized == 0)){
+			isFinalized = 1;
 		} else {
 			revert();
 		}
@@ -62,17 +65,17 @@ contract mhethkeeper {
 
 	/* set new action and set to zero vote */
 	function SetAction(address _recipient, uint256 _count) public{
-		if ((msg.sender == owner) && (ready == 1)){
+		if ((msg.sender == owner) && (isFinalized == 1)){
 			if (this.balance < _count){
 				revert();
 			}
 			recipient = _recipient;
-			count = _count;
+			amountToTransfer = _count;
 			
-			for (uint i = 1; i < managers_count; i++) {
-				managers_voices[i] = 0;
+			for (uint i = 1; i < mgrCount; i++) {
+				mgrVotes[i] = 0;
 			}
-			now_voice = 0;
+			curVotes = 0;
 		} else {
 			revert();
 		}
@@ -80,18 +83,18 @@ contract mhethkeeper {
 
 	/* manager votes for the action */
 	function Approve() public returns (bool){
-		if (ready == 0){
+		if (isFinalized == 0){
 			revert();
 		}
 
-		for (uint i = 1; i <= managers_count; i++) {
-			if (managers[i] == msg.sender){
-				if (managers_voices[i] == 0){
-					managers_voices[i] = 1;
-					now_voice = now_voice + 1;
+		for (uint i = 1; i <= mgrCount; i++) {
+			if (mgrAddress[i] == msg.sender){
+				if (mgrVotes[i] == 0){
+					mgrVotes[i] = 1;
+					curVotes = curVotes + 1;
 
-					if (now_voice >= need_voice){
-						recipient.transfer(count);
+					if (curVotes >= minVotes){
+						recipient.transfer(amountToTransfer);
 						NullSettings();
 					} 
 				} else {
@@ -101,16 +104,16 @@ contract mhethkeeper {
 		}
 	}
 
-	/* set default payable function */
+	/* set a default payable function */
 	function pay() public payable {}
 	
-	/* check adress */
+	/* set a default empty settings  */
 	function NullSettings() private{
 		recipient = address(0x0);
-		count = 0;
-		now_voice = 0;
-		for (uint i = 1; i <= managers_count; i++) {
-			managers_voices[i] = 0;
+		amountToTransfer = 0;
+		curVotes = 0;
+		for (uint i = 1; i <= mgrCount; i++) {
+			mgrVotes[i] = 0;
 		}
 
 	}
